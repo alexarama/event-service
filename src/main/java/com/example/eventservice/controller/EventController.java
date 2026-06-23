@@ -47,4 +47,9 @@ public class EventController {
         eventService.delete(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/{eventId}/register/{userId}")
+    public ResponseEntity<Event> registerUser(@PathVariable Long eventId, @PathVariable Long userId) {
+        return ResponseEntity.ok(eventService.registerUser(eventId, userId));
+    }
 }
