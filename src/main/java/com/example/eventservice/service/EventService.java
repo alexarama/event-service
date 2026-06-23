@@ -5,6 +5,8 @@ import com.example.eventservice.client.UserServiceClient;
 import com.example.eventservice.exception.ResourceNotFoundException;
 import com.example.eventservice.model.Event;
 import com.example.eventservice.repository.EventRepository;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -54,16 +56,13 @@ public class EventService {
         eventRepository.deleteById(id);
     }
 
+    @CircuitBreaker(name = "userService", fallbackMethod = "registerUserFallback")
+    @Retry(name = "userService")
     public Event registerUser(Long eventId, Long userId) {
         Event event = findById(eventId);
 
-        try {
-            UserServiceClient.UserResponse user = userServiceClient.findById(userId);
-            log.info("User {} found, registering to event {}", user.username(), event.getName());
-        } catch (Exception e) {
-            log.error("Could not verify user with id: {}", userId);
-            throw new ResourceNotFoundException("User cu id " + userId + " nu a fost găsit");
-        }
+        UserServiceClient.UserResponse user = userServiceClient.findById(userId);
+        log.info("User {} found, registering to event {}", user.username(), event.getName());
 
         if (event.getAvailableSpots() <= 0) {
             throw new RuntimeException("Nu mai sunt locuri disponibile");
@@ -84,5 +83,10 @@ public class EventService {
         }
 
         return saved;
+    }
+
+    public Event registerUserFallback(Long eventId, Long userId, Exception ex) {
+        log.error("Circuit breaker activated for registerUser: {}", ex.getMessage());
+        throw new RuntimeException("Serviciul de utilizatori nu este disponibil momentan. Încearcă mai târziu.");
     }
 }
